@@ -1,4 +1,3 @@
-
 ##metaheuristique
 import numpy as np
 import random
@@ -11,7 +10,7 @@ if __name__ == '__main__':
     nb_instances, instances = functions.extract_data(mon_fichier)
     
     # Sélectionner une instance spécifique pour l'algorithme génétique
-    num_instance = 4
+    num_instance = 13
     a = instances[num_instance]["A"]
     b = instances[num_instance]["B"]
     cost = instances[num_instance]["cost"]
@@ -24,22 +23,29 @@ if __name__ == '__main__':
     taille_pop = 200
     max_pop = 150
     taux_mut = 0.1
-    sol_init = '0'
+    proba_pertubation = 0.2
 
-    # Exécuter l'algorithme génétiqu
-    L = []
+    # Exécuter l'algorithme génétique
+    sol_init = '0'
+    init = []
     for i in range(5):
         xgen, value_gen = functions.algorithme_genetique(
             n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, 
-            functions.heuristique_sac_a_dos, functions.voisinage, sol_init)
-        
-        L.append(value_gen)
+            functions.heuristique_sac_a_dos, functions.voisinage, sol_init, proba_pertubation)
+        init.append(value_gen)
         #print(i, value_gen)
-    print(L)
+    print('sol init from heur', init)
     print('valopt', val_opt)
-    # Afficher les résultats
-    #print(f"Resultats de l'algorithme genetique pour l'instance {num_instance}:")
-    #print(f"Valeur optimale : {val_opt}")
-    #print(f"Valeur obtenue : {value_gen}")
-    #print(f"Solution : {xgen}")
+
+    sol_init = 'random'
+    rdm = []
+    for i in range(5):
+        xgen, value_gen = functions.algorithme_genetique(
+            n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, 
+            functions.heuristique_sac_a_dos, functions.voisinage, sol_init, proba_pertubation)
+        rdm.append(value_gen)
+        #print(i, value_gen)
+    print('sol init rdm', rdm)
+    print('valopt', val_opt)
+    #print('xgen', xgen)
     pass

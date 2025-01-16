@@ -74,7 +74,7 @@ def heuristique_sac_a_dos(n, m, cost, a, b, fct_voisinage):
 def is_realisable(x, a, b):
     return all(np.dot(a, x) <= b)
 
-
+## 1 bit flip
 def voisinage(x):
     voisins = []
     for i in range(len(x)):
@@ -88,7 +88,7 @@ def voisinage(x):
             voisins.append(x_voisin)
     return voisins
 
-
+## ce voisinage permutte deux bits de x
 def voisinage_echange(x):
     voisins = []
     for i in range(len(x)):
@@ -101,7 +101,7 @@ def voisinage_echange(x):
                     voisins.append(x_voisin)
     return voisins
 
-
+## renvoie un voisinage réalisable
 def voisin_realisable(x, a, b, fct_voisinage):
     voisins = fct_voisinage(x)
     voisins_realisables = []
@@ -125,19 +125,47 @@ def algorithme_montee(xmax, a, b, cost, fct_voisinage):
                 fin = False
     return xmax, value
 
-
-def perturber_solution(x):
+## pertube la solution 
+def perturber_solution(x, proba_pertubation):
     n = x.size
-    for _ in range(np.random.randint(1, 2+ n//10)):
-        index = np.random.randint(len(x))
-        x[index] = 1 - x[index]
+    for _ in range(n):
+        if np.random.rand() < proba_pertubation:
+            index = np.random.randint(n)
+            x[index] = 1 - x[index]
     return x
 
 
 def fit(x, a, b, cost):
-    if not is_realisable(x, a, b):
-        return -1
-    return np.dot(cost, x)
+    method_fit = '0'
+    # Vérifier si la solution est réalisable
+    if method_fit=='1':
+        if not is_realisable(x, a, b):
+                # Pénaliser les solutions non réalisables
+            penalite = np.sum(np.maximum(0, np.dot(a, x) - b))
+            penalite_norm = penalite / (np.sum(b) + 1e-6)  # Normalisation
+            penalite = penalite_norm * np.dot(cost, x)  # Pondération
+            
+            # Calculer la valeur de la solution et appliquer la pénalité
+            valeur = np.dot(cost, x)
+            return max(valeur - penalite, 0)
+
+        # Si la solution est réalisable, calculer la récompense
+        valeur = np.dot(cost, x)
+        used_ressources = np.sum(np.dot(a, x))
+        free_ressources = np.sum(b)
+        
+        # Récompense basée sur la minimisation des ressources utilisées
+        reward = free_ressources - used_ressources
+        reward_norm = reward / (np.sum(b) + 1e-6)  # Normalisation
+        reward = min(reward_norm * valeur, 0.1 * valeur)  # Limiter la récompense à 10% de la valeur
+
+        # Retourner la valeur ajustée avec la récompense
+        return valeur + reward
+    else:
+        if not is_realisable(x, a, b):
+            return 0
+        return np.dot(cost, x)
+
 
 
 def reparation_v2(x, a, b, cost):
@@ -153,29 +181,33 @@ def reparation_v2(x, a, b, cost):
         index_to_pop.pop()
     return x
 
-def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init): 
+def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init, proba_pertubation): 
     if sol_init == 'random':
         x = np.random.randint(0, 2, n)
         if not is_realisable(x, a, b):
             x = reparation_v2(x, a, b, cost)
     else :
         x = generation_solution(n, m, cost, a, b, fct_voisinage)[0]
-    #x = [int(i) for i in x]
-    popu = [x]
+    
+    popu = [x.copy()]
+    
     for _ in range (taille_pop-1):
-        x = perturber_solution(x)
+        x = perturber_solution(x, proba_pertubation)
         popu.append(x)
+    #print(np.array_equal(popu[0], popu[taille_pop-1]))
     return popu
 
 
-def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, generation_solution, fct_voisinage, sol_init):
+def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, generation_solution, fct_voisinage, sol_init, proba_pertubation):
     max_pop = (max_pop//2)*2
     #population initiale
-    pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init)
+    pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init, proba_pertubation)
     random.shuffle(pop)
+    #print('pop', pop)
     #iterations
     for _ in range(nb_iter):
         fit_value = [fit(x, a, b, cost) for x in pop]
+        #print(fit_value)
         proba = [fit_value[i]/sum(fit_value) for i in range(len(fit_value))]
         parents = []
         #selection parents
@@ -205,13 +237,13 @@ def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mu
             child.append(child1)
             child.append(child2)
             #print('x',child2.shape)
-        for j in range(len(child)):
-            if not is_realisable(child[j], a, b):
-                child[j] = reparation_v2(child[j], a, b, cost)
+        #for j in range(len(child)):
+            #if not is_realisable(child[j], a, b):
+                #child[j] = reparation_v2(child[j], a, b, cost)
         #mutation
         for j in range(len(child)):
             if np.random.rand() < taux_mut:
-                child[j] = perturber_solution(child[j])
+                child[j] = perturber_solution(child[j], proba_pertubation)
         pop = parents + child
         random.shuffle(pop)
     valeurs = [fit(x, a, b, cost) for x in pop]
