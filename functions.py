@@ -153,8 +153,13 @@ def reparation_v2(x, a, b, cost):
         index_to_pop.pop()
     return x
 
-def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage):   
-    x = generation_solution(n, m, cost, a, b, fct_voisinage)[0]
+def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init): 
+    if sol_init == 'random':
+        x = np.random.randint(0, 2, n)
+        if not is_realisable(x, a, b):
+            x = reparation_v2(x, a, b, cost)
+    else :
+        x = generation_solution(n, m, cost, a, b, fct_voisinage)[0]
     #x = [int(i) for i in x]
     popu = [x]
     for _ in range (taille_pop-1):
@@ -163,10 +168,10 @@ def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisin
     return popu
 
 
-def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, generation_solution, fct_voisinage):
+def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, generation_solution, fct_voisinage, sol_init):
     max_pop = (max_pop//2)*2
     #population initiale
-    pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage)
+    pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init)
     random.shuffle(pop)
     #iterations
     for _ in range(nb_iter):

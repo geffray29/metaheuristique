@@ -24,16 +24,22 @@ if __name__ == '__main__':
     taille_pop = 200
     max_pop = 150
     taux_mut = 0.1
+    sol_init = '0'
 
-    # Exécuter l'algorithme génétique
-    xgen, value_gen = functions.algorithme_genetique(
-        n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, 
-        functions.heuristique_sac_a_dos, functions.voisinage
-    )
-
+    # Exécuter l'algorithme génétiqu
+    L = []
+    for i in range(5):
+        xgen, value_gen = functions.algorithme_genetique(
+            n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, 
+            functions.heuristique_sac_a_dos, functions.voisinage, sol_init)
+        
+        L.append(value_gen)
+        #print(i, value_gen)
+    print(L)
+    print('valopt', val_opt)
     # Afficher les résultats
-    print(f"Resultats de l'algorithme genetique pour l'instance {num_instance}:")
-    print(f"Valeur optimale : {val_opt}")
-    print(f"Valeur obtenue : {value_gen}")
-    print(f"Solution : {xgen}")
+    #print(f"Resultats de l'algorithme genetique pour l'instance {num_instance}:")
+    #print(f"Valeur optimale : {val_opt}")
+    #print(f"Valeur obtenue : {value_gen}")
+    #print(f"Solution : {xgen}")
     pass
