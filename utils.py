@@ -4,6 +4,7 @@ import random
 import matplotlib.pyplot as plt
 import random
 
+
 def extract_data(mon_fichier):
     with open(mon_fichier, "r") as fichier:
         contenu = fichier.read()
@@ -140,14 +141,12 @@ def perturber_solution(x, proba_pertubation):
 def fit(x, a, b, cost):
     method_fit = '1'
     # Vérifier si la solution est réalisable
-    if method_fit=='1':
+    if method_fit=='1':  ## méthode 1 : pénalisation en fonction de la ressource utilisée
         if not is_realisable(x, a, b):
                 # Pénaliser les solutions non réalisables
             penalite = np.sum(np.maximum(0, np.dot(a, x) - b))
             penalite_norm = penalite / (np.sum(b) + 1e-6)  # Normalisation
             penalite = penalite_norm * np.dot(cost, x)  # Pondération
-            
-            # Calculer la valeur de la solution et appliquer la pénalité
             valeur = np.dot(cost, x)
             return max(valeur - penalite, 0)
 
@@ -160,17 +159,16 @@ def fit(x, a, b, cost):
         reward = free_ressources - used_ressources
         reward_norm = reward / (np.sum(b) + 1e-6)  # Normalisation
         reward = min(reward_norm * valeur, 0.1 * valeur)  # Limiter la récompense à 10% de la valeur
-
-        # Retourner la valeur ajustée avec la récompense
         return valeur + reward
-    else:
+    
+    else: ## méthode 2 : pénalisation par 0 si non réalisable
         if not is_realisable(x, a, b):
             return 0
         return np.dot(cost, x)
 
 
-
-def reparation_v2(x, a, b, cost):
+## Réparer les solutions non réalisables
+def reparation(x, a, b, cost):
     b_prime = np.sum(b) 
     a_prime= np.sum(a, axis=0) 
     y = -cost/a_prime 
@@ -179,7 +177,6 @@ def reparation_v2(x, a, b, cost):
     while any(np.dot(a, x) > b) and index_to_pop:
         last_index = index_to_pop[-1]
         x[last_index] = 0
-        #print(x)
         index_to_pop = index_to_pop[:-1]
     return x
 
@@ -187,14 +184,14 @@ def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisin
     if sol_init == 'random':
         x = np.random.randint(0, 2, n)
         if not is_realisable(x, a, b):
-            x = reparation_v2(x, a, b, cost)
+            x = reparation(x, a, b, cost)
     else :
         x = generation_solution(n, m, cost, a, b, fct_voisinage)[0]
         x = algorithme_montee(x, a, b, cost, fct_voisinage)[0]
-    #x = x.copy()
+
     popu = [x.copy()]
     
-    generation_init = '0'
+    generation_init = '0' ## 2 méthodes de générationde la population initiale : de manière aléatoire ou en perturbant la solution initiale
     if generation_init == 'random':
         for _ in range (taille_pop-1):
             x = np.random.randint(0, 2, n)
@@ -207,94 +204,12 @@ def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisin
     print(np.array_equal(popu[0], popu[taille_pop-1]))
     return popu
 
-
-def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, generation_solution, fct_voisinage, sol_init, proba_pertubation):
-    max_pop = (max_pop//2)*2
-    #population initiale
-    pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init, proba_pertubation)
-    random.shuffle(pop)
-    #print('pop', pop)
-    #iterations
-    for i in range(nb_iter):
-        fit_value = [fit(x, a, b, cost) for x in pop]
-        #print(fit_value)
-        proba = [fit_value[i]/sum(fit_value) for i in range(len(fit_value))]
-        parents = []
-        #selection parents
-        while len(parents) < max_pop:
-            for i in range(len(pop)):
-                if np.random.rand() < proba[i]:
-                    parents.append(pop[i])
-        parents = parents[:max_pop]
-        #croisement
-        #1-point crossover
-        child = []
-        for i in range(0, len(parents), 2):
-            cut = np.random.randint(1, n)
-            #print(len(parents[i]))
-            #print(len(parents[i+1]))
-            child1 = np.concatenate((parents[i][:cut], parents[i+1][cut:]))
-            child2 = np.concatenate((parents[i+1][:cut], parents[i][cut:]))
-            #print('x',child2.shape)
-            child.append(child1)
-            child.append(child2)
-        #2-point crossover
-        random.shuffle(parents)
-        for i in range(0, len(parents), 2):
-            p1, p2 = sorted(np.random.choice(range(n), size=2, replace=False))
-            child1 = np.concatenate((parents[i][:p1], parents[i+1][p1:p2], parents[i][p2:]))
-            child2 = np.concatenate((parents[i+1][:p1], parents[i][p1:p2], parents[i+1][p2:]))
-            child.append(child1)
-            child.append(child2)
-            #print('x',child2.shape)
-        #for j in range(len(child)):
-            #if not is_realisable(child[j], a, b):
-                #child[j] = reparation_v2(child[j], a, b, cost)
-        #mutation
-        for j in range(len(child)):
-            if np.random.rand() < taux_mut:
-                child[j] = perturber_solution(child[j], proba_pertubation)
-        pop = parents + child
-        random.shuffle(pop)
-
-    #sélection finale
-
-    valeurs = [fit(x, a, b, cost) for x in pop]
-    index_sorted = sorted(range(len(valeurs)), key = lambda i:valeurs[i])
-
-    ##prendre une sol realisable
-    method_real='1'
-    if method_real=='1':
-        pop[index_sorted[0]] = reparation_v2(pop[index_sorted[0]], a, b, cost)  ##éviter la boucle infinie
-        while not is_realisable(pop[index_sorted[-1]], a, b): ##prendre la meilleure solution réalisable
-            index_sorted = index_sorted[:-1]
-        x = pop[index_sorted[-1]]
-
-    else:
-        if not is_realisable(pop[index_sorted[-1]], a, b):
-            pop[index_sorted[-1]] = reparation_v2(pop[index_sorted[-1]], a, b, cost) ##réparer la meilleure solution
-            x= pop[index_sorted[-1]]
-        else:
-            x = pop[index_sorted[-1]]
-    value = np.dot(cost, x)
-    return x, value
-
-
-####### STATISTIQUES ########
-
-
-
-
-import matplotlib.pyplot as plt
-import numpy as np
-import random
-
-
+## croisement utilisé dans la deuxième et troisième version de l'algorithme génétique
 def croisement(parent1, parent2, cost, iteration):
     if iteration % 2 == 0:  # Croisement uniforme
         child1 = np.array([parent1[k] if np.random.rand() < 0.5 else parent2[k] for k in range(len(parent1))])
         child2 = np.array([parent2[k] if np.random.rand() < 0.5 else parent1[k] for k in range(len(parent1))])
-    else:  # Croisement multi-points
+    else:  # Croisement multi-points, avec sélection des élites
         contribution_parent1 = np.cumsum(parent1 * cost)
         contribution_parent2 = np.cumsum(parent2 * cost)
 
@@ -319,15 +234,81 @@ def mutation(solution, proba_pertubation):
     ])
 
 
+### PREMIERE VERSION DE L'ALGORITHME GENETIQUE
 
-def algorithme_genetique_stats(
+def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, generation_solution, fct_voisinage, sol_init, proba_pertubation):
+    max_pop = (max_pop//2)*2
+    pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init, proba_pertubation)
+    random.shuffle(pop)
+  
+    for i in range(nb_iter):
+        fit_value = [fit(x, a, b, cost) for x in pop]
+        proba = [fit_value[i]/sum(fit_value) for i in range(len(fit_value))]
+        parents = []
+        #selection parents
+        while len(parents) < max_pop:
+            for i in range(len(pop)):
+                if np.random.rand() < proba[i]:
+                    parents.append(pop[i])
+        parents = parents[:max_pop]
+        #croisement
+        #1-point crossover
+        child = []
+        for i in range(0, len(parents), 2):
+            cut = np.random.randint(1, n)
+            child1 = np.concatenate((parents[i][:cut], parents[i+1][cut:]))
+            child2 = np.concatenate((parents[i+1][:cut], parents[i][cut:]))
+            child.append(child1)
+            child.append(child2)
+        #2-point crossover
+        random.shuffle(parents)
+        for i in range(0, len(parents), 2):
+            p1, p2 = sorted(np.random.choice(range(n), size=2, replace=False))
+            child1 = np.concatenate((parents[i][:p1], parents[i+1][p1:p2], parents[i][p2:]))
+            child2 = np.concatenate((parents[i+1][:p1], parents[i][p1:p2], parents[i+1][p2:]))
+            child.append(child1)
+            child.append(child2)
+        for j in range(len(child)):
+            if np.random.rand() < taux_mut:
+                child[j] = perturber_solution(child[j], proba_pertubation)
+        pop = parents + child
+        random.shuffle(pop)
+
+    #sélection finale
+    valeurs = [fit(x, a, b, cost) for x in pop]
+    index_sorted = sorted(range(len(valeurs)), key = lambda i:valeurs[i])
+
+    ##prendre une solution realisable
+    method_real='1'
+    if method_real=='1':
+        pop[index_sorted[0]] = reparation(pop[index_sorted[0]], a, b, cost)  ##éviter la boucle infinie
+        while not is_realisable(pop[index_sorted[-1]], a, b): ##prendre la meilleure solution réalisable
+            index_sorted = index_sorted[:-1]
+        x = pop[index_sorted[-1]]
+
+    else:
+        if not is_realisable(pop[index_sorted[-1]], a, b):
+            pop[index_sorted[-1]] = reparation(pop[index_sorted[-1]], a, b, cost) ##réparer la meilleure solution
+            x= pop[index_sorted[-1]]
+        else:
+            x = pop[index_sorted[-1]]
+    value = np.dot(cost, x)
+    return x, value
+
+
+### DEUXIEME VERSION DE L'ALGORITHME GENETIQUE
+
+def algorithme_genetique_withstats(
     n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, 
     generation_solution, fct_voisinage, sol_init, proba_pertubation
 ):
+    'Utilisation de nouveaux croisements et mutation adaptative'
+    'Suivi des statistiques'    
+
     max_pop = (max_pop // 2) * 2
     # Population initiale
     pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init, proba_pertubation)
-    #random.shuffle(pop)
+    random.shuffle(pop)
 
     # Stockage des statistiques
     stats = {'iteration': [], 'max_fitness': [], 'mean_fitness': [], 'fitness_variance': [], 'best_realisable': []}
@@ -369,7 +350,6 @@ def algorithme_genetique_stats(
         child = []
         for i in range(0, len(parents), 2):
             parent1, parent2 = parents[i], parents[i + 1]
-            #parent1, parent2 = parents[i], parents[np.random.randint(0,len(parents))]
             child1, child2 = croisement(parent1, parent2, cost, iteration)
             child.append(child1)
             child.append(child2)
@@ -384,35 +364,29 @@ def algorithme_genetique_stats(
             if np.random.rand() < taux_mut_adaptatif:
                 child[j] = mutation(child[j], proba_pertubation)
 
-        # Conserver les solutions élites (élitisme)
+        # Conserver les solutions élites 
         elite_count = max(1, len(pop) // 10)  # 10% des meilleurs individus
         elites_pop = sorted(pop, key=lambda x: fit(x, a, b, cost), reverse=True)[:elite_count]
-        #elites_child = sorted(child, key=lambda x: fit(x, a, b, cost), reverse=True)[:elite_count]
         pop = elites_pop + parents + child
         pop = pop[:taille_pop]  # Réduire à la taille de population initiale
-        #random.shuffle(pop)
+        random.shuffle(pop)
 
-        #if iteration%5==0:
-            #print(np.array_equal(pop[0], pop[len(pop)//10]))
-            #print(fitness_variance)
 
     # Sélection finale
-    #sélection finale
-
     valeurs = [fit(x, a, b, cost) for x in pop]
     index_sorted = sorted(range(len(valeurs)), key = lambda i:valeurs[i])
 
     ##prendre une sol realisable
     method_real='1'
     if method_real=='1':
-        pop[index_sorted[0]] = reparation_v2(pop[index_sorted[0]], a, b, cost)  ##éviter la boucle infinie
+        pop[index_sorted[0]] = reparation(pop[index_sorted[0]], a, b, cost)  ##éviter la boucle infinie
         while not is_realisable(pop[index_sorted[-1]], a, b): ##prendre la meilleure solution réalisable
             index_sorted = index_sorted[:-1]
         x = pop[index_sorted[-1]]
 
     else:
         if not is_realisable(pop[index_sorted[-1]], a, b):
-            pop[index_sorted[-1]] = reparation_v2(pop[index_sorted[-1]], a, b, cost) ##réparer la meilleure solution
+            pop[index_sorted[-1]] = reparation(pop[index_sorted[-1]], a, b, cost) ##réparer la meilleure solution
             x= pop[index_sorted[-1]]
         else:
             x = pop[index_sorted[-1]]
@@ -438,10 +412,12 @@ def algorithme_genetique_stats(
 
 
 
+
 def algorithme_genetique_v3(
     n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, 
     generation_solution, fct_voisinage, sol_init, proba_pertubation
 ):
+    'Faire croiser les 2 meilleurs individus puis mutation'
     max_pop = (max_pop // 2) * 2
     # Population initiale
     pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init, proba_pertubation)
@@ -481,31 +457,28 @@ def algorithme_genetique_v3(
             x_best = pop[best_idx]
             best_value = values[best_idx]
 
-        x1 = pop[best_idx]
-        x2 = pop[second_best_idx]
-        x_cross, a = croisement(x1, x2, cost, iteration)
+        parent1 = pop[best_idx]
+        parent2 = pop[second_best_idx]
+        x_cross, a = croisement(parent1, parent2, cost, iteration)
 
         x_mut = mutation(x_cross, proba_pertubation)
 
         worst_idx = values.index(min(values))
         pop[worst_idx] = x_mut
-        #print(len(x1), len(x2), len(x_cross), len(x_mut))
-        print(
-            f"Nouvelle solution trouvée :{best_value} : {is_realisable(x_best, a, b)}")
-    ##prendre une sol realisable
 
+    ##prendre une sol realisable
     valeurs = [fit(x, a, b, cost) for x in pop]
     index_sorted = sorted(range(len(valeurs)), key = lambda i:valeurs[i])
     method_real='1'
-    if method_real=='1':
-        pop[index_sorted[0]] = reparation_v2(pop[index_sorted[0]], a, b, cost)  ##éviter la boucle infinie
+    if method_real=='1': # prendre la première solution réalisable
+        pop[index_sorted[0]] = reparation(pop[index_sorted[0]], a, b, cost)  ##éviter la boucle infinie
         while not is_realisable(pop[index_sorted[-1]], a, b): ##prendre la meilleure solution réalisable
             index_sorted = index_sorted[:-1]
         x = pop[index_sorted[-1]]
 
     else:
         if not is_realisable(pop[index_sorted[-1]], a, b):
-            pop[index_sorted[-1]] = reparation_v2(pop[index_sorted[-1]], a, b, cost) ##réparer la meilleure solution
+            pop[index_sorted[-1]] = reparation(pop[index_sorted[-1]], a, b, cost) ##réparer la meilleure solution
             x= pop[index_sorted[-1]]
         else:
             x = pop[index_sorted[-1]]
