@@ -72,7 +72,7 @@ def heuristique_sac_a_dos(n, m, cost, a, b, fct_voisinage):
 
 
 def is_realisable(x, a, b):
-    return all(np.dot(a, x) <= b)
+    return np.all(np.dot(a, x) <= b)
 
 
 def voisinage(x):
@@ -139,7 +139,47 @@ def fit(x, a, b, cost):
         return -1
     return np.dot(cost, x)
 
+def reparation(N, M, a, b, c, x):
+    """ Heuristique de réparation pour le problème du sac à dos multidimensionnel.
+    Paramètres :
+    N : Nombre de projets
+    M : Nombre de ressources
+    c : Liste des gains associés aux projets.
+    a : Matrice (M x N) des consommations de ressources.
+    b : Liste des quantités disponibles de chaque ressource.
+    x : Solution initiale (vecteur binaire).
+    Retourne :
+    x : Solution binaire (0 ou 1) indiquant les projets sélectionnés.
+    gain : Gain totale de la solution x réparée
+    """
+    # Calcul de ressouces consommées r[i] pour chaque ressource i
+    r = [sum(a[i][j] * x[j] for j in range(N)) for i in range(M)]
+    # Phase de supression: le but est de minimiser les pertes lors de la suppression
+    while any(r[i] > b[i] for i in range(M)):  # Tant qu'il existe des contraintes violées
+        # Calcul de p la liste de priorité pour chaque j tel que x[j] = 1
+        p = [(j, c[j] / sum(a[i][j] for i in range(M)))
+             for j in range(N) if x[j] == 1]
+        p.sort(key=lambda y: y[1])  # tri des priorités par ordre croissant
+        j_sup = p[0][0]  # l'indice j à supprimer
+        x[j_sup] = 0  # suppression de l'élément j de faible priorité
+        for i in range(M):
+            r[i] -= a[i][j_sup]
+    # Phase d'ajout: le but est de maximiser les gains lors de l'ajout
+    # Calcul de e la liste d'efficacité pour chaque j tel que x[j] = 0
+    e = [(j, c[j] / sum(a[i][j] for i in range(M)))
+         for j in range(N) if x[j] == 0]
+    # tri des efficacités par ordre décroissant
+    e.sort(key=lambda y: y[1], reverse=True)
+    # Ajout des projets x[j]=1 dans la solution tant que cela ne viole pas les contraintes
+    for j, _ in e:
+        if all(r[i] + a[i][j] <= b[i] for i in range(M)):
+            x[j] = 1
+            for i in range(M):
+                r[i] += a[i][j]
+    gain = sum(c[j] * x[j] for j in range(N))
+    return x, gain
 
+'''
 def reparation_v2(x, a, b, cost):
     b_prime = np.sum(b) 
     a_prime= np.sum(a, axis=0) 
@@ -152,7 +192,91 @@ def reparation_v2(x, a, b, cost):
         #print(x)
         index_to_pop.pop()
     return x
+'''
 
+def hamming_1(x):
+    """Génère tous les voisins à une distance de Hamming = 1."""
+    neighbors = []
+    for i in range(len(x)):
+        neighbor = x.copy()
+        neighbor[i] = 1 - neighbor[i]  # Inverse le bit
+        neighbors.append(neighbor)
+    return neighbors
+
+def gen_sol_initiale(N):
+    """ Génère une solution initiale binaire aléatoire. 
+    Paramètres :
+    N : Nombre de projets
+    Retourne :
+    x : Solution initiale binaire (0 ou 1) indiquant les projets sélectionnés.
+    """
+    return [random.randint(0, 1) for _ in range(N)]
+
+def gen_voisin_perm(N, M, a, b, c, x, max_iter=100):
+    """ Génère une solution voisine, par séléction et permutation d'un projet sélectionné et 
+    d'un autre non séléctionné, pour le problème du sac à dos multidimensionnel.
+    """
+
+    # Tableau des indices des projets selectionnés dans la solution x
+    selec = [i for i, xi in enumerate(x) if xi == 1]
+    # Tableau des indices des projets non selectionnés dans la solution x
+    non_selec = [i for i, xi in enumerate(x) if xi == 0]
+
+    for _ in range(max_iter):
+
+        # Choix aléatoire d'un projet selectionné
+        p_selec = random.choice(selec)
+        # Choix aléatoire d'un projet non selectionné
+        p_non_selec = random.choice(non_selec)
+
+        x_vois = x[:]
+
+        # permutation des deux projets
+
+        x_vois[p_selec] = 0
+        x_vois[p_non_selec] = 1
+
+        if is_realisable(x_vois, a, b):
+            return x_vois
+
+    return x
+
+def gen_random_sols(N, M, a, b, c, n_sols):
+    """Fonction qui génère n_sols solutions aléatoires pour le problème.
+    On génère une solution initiale aléatoire, on la répare et on génère n_sols-1 solutions en explorant les voisins en utilsant la permutaion.
+    """
+    first_rd_sol = gen_sol_initiale(N)
+    feasible_sol, _ = reparation(N, M, a, b, c, first_rd_sol)
+
+    # On génère n_sols solutions aléatoires on explorant les voisinages
+    sols = [feasible_sol]
+    for _ in range(n_sols-1):
+        x = feasible_sol.copy()
+        for _ in range(10):
+            x = gen_voisin_perm(N, M, a, b, c, x)
+        sols.append(x)
+
+    return sols
+def gen_feasible_sols(N, M, a, b, c, n_sols):
+    """Fonction qui génère n_sols solutions aléatoires pour le problème. On génère une solution initiale aléatoire, on la répare et on génère n_sols-1 solutions en explorant les voisins avec la methode de la distance de Hamming.
+    """
+    first_rd_sol = gen_sol_initiale(N)
+    feasible_sol, _ = reparation(N, M, a, b, c, first_rd_sol)
+    
+    sols = [feasible_sol]
+    iters = 0
+    while iters < n_sols:
+        x = feasible_sol.copy()
+        x = hamming_1(x)
+        # if soltion is feasible add it to the list
+        for x_vois in x:
+            if is_realisable(x_vois, a, b):
+                sols.append(x_vois)
+                iters += 1
+                if iters == n_sols:
+                    break
+    return sols
+'''
 def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage):   
     x = generation_solution(n, m, cost, a, b, fct_voisinage)[0]
     #x = [int(i) for i in x]
@@ -161,12 +285,12 @@ def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisin
         x = perturber_solution(x)
         popu.append(x)
     return popu
-
+'''
 
 def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, generation_solution, fct_voisinage):
     max_pop = (max_pop//2)*2
     #population initiale
-    pop = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage)
+    pop = gen_feasible_sols(n, m, a, b, cost, taille_pop)
     random.shuffle(pop)
     #iterations
     for _ in range(nb_iter):
@@ -202,7 +326,7 @@ def algorithme_genetique(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mu
             #print('x',child2.shape)
         for j in range(len(child)):
             if not is_realisable(child[j], a, b):
-                child[j] = reparation_v2(child[j], a, b, cost)
+                child[j] = reparation(n, m, a, b, cost, child[j])
         #mutation
         for j in range(len(child)):
             if np.random.rand() < taux_mut:
