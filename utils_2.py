@@ -3,6 +3,18 @@ import requests
 import random
 import matplotlib.pyplot as plt
 import random
+from meta_genetique import reparation as reparation_y
+
+
+def selection_pop(pop, values):
+    proba = [values[i]/sum(values) for i in range(len(values))]
+    a=0
+    while a==0:
+        for i in range(len(pop)):
+            if np.random.rand() < proba[i]:
+                x = pop[i]
+                a=1
+    return x
 
 
 def extract_data(mon_fichier):
@@ -138,49 +150,8 @@ def perturber_solution(x, proba_pertubation):
     return x
 
 
-def reparation_y(N, M, a, b, c, x):
-    """ Heuristique de réparation pour le problème du sac à dos multidimensionnel.
-    Paramètres :
-    N : Nombre de projets
-    M : Nombre de ressources
-    c : Liste des gains associés aux projets.
-    a : Matrice (M x N) des consommations de ressources.
-    b : Liste des quantités disponibles de chaque ressource.
-    x : Solution initiale (vecteur binaire).
-    Retourne :
-    x : Solution binaire (0 ou 1) indiquant les projets sélectionnés.
-    gain : Gain totale de la solution x réparée
-    """
-    # Calcul de ressouces consommées r[i] pour chaque ressource i
-    r = [sum(a[i][j] * x[j] for j in range(N)) for i in range(M)]
-    # Phase de supression: le but est de minimiser les pertes lors de la suppression
-    while any(r[i] > b[i] for i in range(M)):  # Tant qu'il existe des contraintes violées
-        # Calcul de p la liste de priorité pour chaque j tel que x[j] = 1
-        p = [(j, c[j] / sum(a[i][j] for i in range(M)))
-             for j in range(N) if x[j] == 1]
-        p.sort(key=lambda y: y[1])  # tri des priorités par ordre croissant
-        j_sup = p[0][0]  # l'indice j à supprimer
-        x[j_sup] = 0  # suppression de l'élément j de faible priorité
-        for i in range(M):
-            r[i] -= a[i][j_sup]
-    # Phase d'ajout: le but est de maximiser les gains lors de l'ajout
-    # Calcul de e la liste d'efficacité pour chaque j tel que x[j] = 0
-    e = [(j, c[j] / sum(a[i][j] for i in range(M)))
-         for j in range(N) if x[j] == 0]
-    # tri des efficacités par ordre décroissant
-    e.sort(key=lambda y: y[1], reverse=True)
-    # Ajout des projets x[j]=1 dans la solution tant que cela ne viole pas les contraintes
-    for j, _ in e:
-        if all(r[i] + a[i][j] <= b[i] for i in range(M)):
-            x[j] = 1
-            for i in range(M):
-                r[i] += a[i][j]
-    gain = sum(c[j] * x[j] for j in range(N))
-    return x, gain
-
-
 def fit(x, a, b, cost):
-    method_fit = '1'
+    method_fit = '0'
     # Vérifier si la solution est réalisable
     if method_fit=='1':  ## méthode 1 : pénalisation en fonction de la ressource utilisée
         if not is_realisable(x, a, b):
@@ -199,7 +170,7 @@ def fit(x, a, b, cost):
         # Récompense basée sur la minimisation des ressources utilisées
         reward = free_ressources - used_ressources
         reward_norm = reward / (np.sum(b) + 1e-6)  # Normalisation
-        reward = min(reward_norm * valeur, 0.1 * valeur)  # Limiter la récompense à 10% de la valeur
+        reward = min(reward_norm * valeur, 0.02 * valeur)  # Limiter la récompense à 10% de la valeur
         return valeur + reward
     
     else: ## méthode 2 : pénalisation par 0 si non réalisable
@@ -223,14 +194,15 @@ def reparation(x, a, b, cost):
 
 def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init, proba_pertubation): 
     if sol_init == 'random':
-        x = np.random.randint(0, 2, n)
-        if not is_realisable(x, a, b):
-            x = reparation_y(n,m,a,b,cost,x)[0] 
+        sol_init = np.random.randint(0, 2, n)
+        if not is_realisable(sol_init, a, b):
+            sol_init,_ = reparation_y(n, m, a, b, cost, sol_init)
     else :
-        x = generation_solution(n, m, cost, a, b, fct_voisinage)[0]
-        x = algorithme_montee(x, a, b, cost, fct_voisinage)[0]
+        sol_init = generation_solution(n, m, cost, a, b, fct_voisinage)[0]
+        sol_init = algorithme_montee(sol_init, a, b, cost, fct_voisinage)[0]
 
-    popu = [x.copy()]
+    #y = x.copy()
+    popu = [sol_init]
     
     generation_init = '0' ## 2 méthodes de générationde la population initiale : de manière aléatoire ou en perturbant la solution initiale
     if generation_init == 'random':
@@ -240,9 +212,11 @@ def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisin
 
     else :
         for _ in range (taille_pop-1):
-            x = perturber_solution(x, proba_pertubation)
+            x = sol_init.copy()
+            x = mutation(x, a, b, cost)
             popu.append(x)
-    print(np.array_equal(popu[0], popu[taille_pop-1]))
+    #print(np.array_equal(popu[0], popu[taille_pop-1]))
+    
     return popu
 
 ## croisement utilisé dans la deuxième et troisième version de l'algorithme génétique
@@ -257,7 +231,7 @@ def croisement(parent1, parent2, cost, iteration):
         start = min(np.argmax(contribution_parent1), len(parent1) - 1)
         stop = min(np.argmax(contribution_parent2), len(parent1))
 
-        print(np.array_equal(parent1, parent2))
+        #print(np.array_equal(parent1, parent2))
 
         if stop < start:
             start, stop = stop, start
@@ -268,11 +242,13 @@ def croisement(parent1, parent2, cost, iteration):
     return child1, child2
 
 
-def mutation(solution, proba_pertubation):
-    return np.array([
-        1 - bit if np.random.rand() < proba_pertubation else bit
-        for bit in solution
-    ])
+def mutation(solution, a, b, cost):
+    x = solution.copy()
+    rdn = random.randint(0, len(x)-1)
+    x[rdn] = 1 - x[rdn]
+    if not is_realisable(x, a, b):
+        x = reparation(x, a, b, cost)
+    return x
 
 
 ### PREMIERE VERSION DE L'ALGORITHME GENETIQUE
@@ -420,14 +396,14 @@ def algorithme_genetique_withstats(
     ##prendre une sol realisable
     method_real='1'
     if method_real=='1':
-        pop[index_sorted[0]] = reparation_y(n,m,a,b,cost,pop[index_sorted[-1]])[0]   ##éviter la boucle infinie
+        pop[index_sorted[0]] = reparation(pop[index_sorted[0]], a, b, cost)  ##éviter la boucle infinie
         while not is_realisable(pop[index_sorted[-1]], a, b): ##prendre la meilleure solution réalisable
             index_sorted = index_sorted[:-1]
         x = pop[index_sorted[-1]]
 
     else:
         if not is_realisable(pop[index_sorted[-1]], a, b):
-            pop[index_sorted[-1]] = reparation_y(n,m,a,b,cost,pop[index_sorted[-1]])[0]  ##réparer la meilleure solution
+            pop[index_sorted[-1]] = reparation(pop[index_sorted[-1]], a, b, cost) ##réparer la meilleure solution
             x= pop[index_sorted[-1]]
         else:
             x = pop[index_sorted[-1]]
