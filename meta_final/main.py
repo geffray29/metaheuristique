@@ -12,7 +12,7 @@ if __name__ == '__main__':
     nb_instances, instances = extract_data(mon_fichier)
     
     # Sélectionner une instance spécifique pour l'algorithme génétique
-    num_instance = 4
+    num_instance = 5
     a = instances[num_instance]["A"]
     b = instances[num_instance]["B"]
     cost = instances[num_instance]["cost"]
@@ -30,7 +30,6 @@ if __name__ == '__main__':
     # Exécuter l'algorithme génétique
     sol_init = 'random'
     
-    #real = []
   
     xgen, value_gen = genetic_algo(
     n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, 
@@ -43,6 +42,5 @@ if __name__ == '__main__':
     print('sol monte', value_monte)
     print('sol init from mont', value_gen)
     print('valopt', val_opt)
-    #print('realisable', real)
 
     pass

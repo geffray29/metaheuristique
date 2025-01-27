@@ -50,36 +50,21 @@ def selection_pop(pop, values):
 
 def heuristique_sac_a_dos(n, m, cost, a, b, fct_voisinage):
     x= np.zeros(n)
-    #print('xtype', type(x)) 
     b_prime = np.sum(b) #somme des ressources
-    #print('b_prime=', b_prime) 
     a_prime= np.sum(a, axis=0) #somme des ressources nécessaires pour chaque projet
-    #print('a_prime=', a_prime)
     y = -cost/a_prime #signe - pour trier dans l'ordre décroissant
-    #print(y)
     indices =y.argsort()
-    #print('indices', indices)
     ressource = 0
     index = []
     for i in indices:
         if ressource + a_prime[i] <= b_prime:
             x[i] = 1
             ressource += a_prime[i]
-            #print('i=', i)
-            #print('ressource', ressource)
-            #print('b_prime', b_prime)
             index.append(i) 
-    #print("x before dot (a,x) ", x)
-    #verification solution réalisable + réparation
     while any(np.dot(a, x) > b):
-        #print('x=', x)
-        #print('p=',(np.dot(a, x)))
-        #print('b=',b)
         last_index = index[-1]
         x[last_index] = 0
-        #print(x)
         index = index[:-1]
-    #print("x after dot (a,x) ", x)
     value = np.dot(cost, x)
 
     return x, value
@@ -146,7 +131,6 @@ def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisin
         sol_init = generation_solution(n, m, cost, a, b, fct_voisinage)[0]
         sol_init = algorithme_montee(sol_init, a, b, cost, fct_voisinage)[0]
 
-    #y = x.copy()
     popu = [sol_init]
     
     generation_init = '0' ## 2 méthodes de générationde la population initiale : de manière aléatoire ou en perturbant la solution initiale
@@ -160,7 +144,6 @@ def generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisin
             x = sol_init.copy()
             x = mutate_solution(n, m, a, b, cost, x)
             popu.append(x)
-    #print(np.array_equal(popu[0], popu[taille_pop-1]))
     
     return popu
 
@@ -175,8 +158,6 @@ def croisement(parent1, parent2, cost, iteration):
 
         start = min(np.argmax(contribution_parent1), len(parent1) - 1)
         stop = min(np.argmax(contribution_parent2), len(parent1))
-
-        #print(np.array_equal(parent1, parent2))
 
         if stop < start:
             start, stop = stop, start
@@ -199,22 +180,7 @@ def mutate_solution(N, M, a, b, c, x):
 ### PREMIERE VERSION DE L'ALGORITHME GENETIQUE
 
 def genetic_algo(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, generation_solution, fct_voisinage, sol_init, proba_pertubation):
-    """ Méthode de recherche locale pour le problème du sac à dos multidimensionnel.
 
-    Paramètres :
-    c : Liste des gains associés aux projets.
-    a : Matrice (M x N) des consommations de ressources.
-    b : Liste des quantités disponibles de chaque ressource.
-    max_iter : Nombre maximal d'itérations.
-    pop_size : Taille de la population.
-
-    Retourne :
-    x_best : Meilleure solution trouvée.
-    best_value : Gain total associé à la meilleure solution.
-    """
-    # ajouter critère d'arrêt
-    #time = 0
-    #population = gen_feasible_sols(n, m, a, b, cost, taille_pop)
     population = generation_pop(n, m, cost, a, b, taille_pop, generation_solution, fct_voisinage, sol_init, proba_pertubation)
     best_value = 0
     x_best = population[0]
@@ -243,8 +209,6 @@ def genetic_algo(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, gener
         parent1 = selection_pop(population, values)
         parent2 = selection_pop(population, values)
         child1 = croisement(parent1, parent2, cost,iter)[0]
-        #print('child1',is_realisable(child1, a, b))
-        #print('child2', is_realisable(child1, a, b))
         child2 = croisement(parent1, parent2, cost,iter)[1]
         x_mut1 = mutate_solution(n, m, a, b, cost, child1)
         x_mut2 = mutate_solution(n, m, a, b, cost, child2)
@@ -257,14 +221,10 @@ def genetic_algo(n, m, cost, a, b, nb_iter, taille_pop, max_pop, taux_mut, gener
         population[index[2]] = child1
         population[index[3]] = child2
 
-        #worst_idx = values.index(min(values))
-        #population[worst_idx] = x_mut
-
 
     plt.figure(figsize=(10, 6))
     plt.plot(stats['iteration'], stats['max_fitness'], label='Max Fitness', linewidth=2)
     plt.plot(stats['iteration'], stats['mean_fitness'], label='Mean Fitness', linewidth=2)
-    #plt.plot(stats['iteration'], stats['best_realisable'], label='Best Realisable Fitness', linewidth=2, linestyle='--')
     plt.fill_between(stats['iteration'], 
                      np.array(stats['mean_fitness']) - np.sqrt(stats['fitness_variance']), 
                      np.array(stats['mean_fitness']) + np.sqrt(stats['fitness_variance']), 
